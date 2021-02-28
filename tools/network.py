@@ -31,24 +31,26 @@ CONTENT_DISPOSITION_HEADER = "Content-Disposition"
 CONTENT_DISPOSITION_BYTE_HEADER = QByteArray(bytes(CONTENT_DISPOSITION_HEADER, ENCODING))
 
 
-def fetch(url: str, encoding: str = ENCODING) -> str:
+def fetch(url: str, encoding: str = ENCODING, authcfg_id: str = '') -> str:
     """
     Fetch resource from the internet. Similar to requests.get(url) but is
     recommended way of handling requests in QGIS plugin
     :param url: address of the web resource
     :param encoding: Encoding which will be used to decode the bytes
+    :param authcfg_id: authcfg id from QGIS settings, defaults to ''
     :return: encoded string of the content
     """
-    content, _ = fetch_raw(url, encoding)
+    content, _ = fetch_raw(url, encoding, authcfg_id)
     return content.decode(ENCODING)
 
 
-def fetch_raw(url: str, encoding: str = ENCODING) -> Tuple[bytes, str]:
+def fetch_raw(url: str, encoding: str = ENCODING, authcfg_id: str = '') -> Tuple[bytes, str]:
     """
     Fetch resource from the internet. Similar to requests.get(url) but is
     recommended way of handling requests in QGIS plugin
     :param url: address of the web resource
     :param encoding: Encoding which will be used to decode the bytes
+    :param authcfg_id: authcfg id from QGIS settings, defaults to ''
     :return: bytes of the content and default name of the file or empty string
     """
     LOGGER.debug(url)
@@ -62,6 +64,8 @@ def fetch_raw(url: str, encoding: str = ENCODING) -> Tuple[bytes, str]:
     # https://www.riverbankcomputing.com/pipermail/pyqt/2016-May/037514.html
     req.setRawHeader(b"User-Agent", bytes(user_agent, encoding))
     request_blocking = QgsBlockingNetworkRequest()
+    if authcfg_id:
+        request_blocking.setAuthCfg(authcfg_id)
     _ = request_blocking.get(req)
     reply: QgsNetworkReplyContent = request_blocking.reply()
     reply_error = reply.error()
