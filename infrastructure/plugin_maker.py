@@ -21,7 +21,7 @@ __revision__ = "$Format:%H$"
 
 
 def is_windows():
-    return "win" in sys.platform
+    return False if "darwin" in sys.platform else "win" in sys.platform
 
 
 PLUGINNAME = plugin_name()

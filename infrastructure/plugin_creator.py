@@ -63,7 +63,7 @@ pre-commit install
 
 
 def is_windows():
-    return "win" in sys.platform
+    return False if "darwin" in sys.platform else "win" in sys.platform
 
 
 class PluginCreator:
