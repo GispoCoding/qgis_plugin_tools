@@ -1,11 +1,12 @@
 """Setting up logging using QGIS, file, Sentry..."""
 
+import functools
 import logging
 import warnings
 from enum import Enum, unique
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from qgis.core import Qgis, QgsMessageLog
 from qgis.gui import QgisInterface, QgsMessageBar
@@ -426,3 +427,44 @@ def teardown_logger(logger_name: str) -> None:
     # if the logger name was plugin_name(), also clean up the special case logger
     if logger_name == plugin_name():
         teardown_logger(__name__.removesuffix(".tools.custom_logging"))
+
+
+def teardown_loggers(logger_names: List[str]) -> None:
+    """
+    Remove the added handlers from the speficied handler.
+    """
+    for logger_name in logger_names:
+        teardown_logger(logger_name)
+
+
+def setup_loggers(
+    *logger_names: str,
+    message_log_name: str,
+    message_bar: Optional[QgsMessageBar] = None,
+) -> Callable[[], None]:
+    """
+    Setups all the loggers for the given logger names.
+
+    Returns a teardown callback so setup can be called in initGui and
+    the returned callback in unload.
+    """
+    if message_bar is None:
+        try:
+            from qgis.utils import iface
+
+            message_bar = iface.messageBar()
+        except ImportError:
+            message_bar = None
+
+    handlers = _create_handlers(message_log_name, message_bar)
+
+    for logger_name in logger_names:
+        logger = logging.getLogger(logger_name)
+
+        # take the lowest level from the enabled handlers
+        logger.setLevel(min(h.level for h in handlers))
+
+        for handler in handlers:
+            add_logging_handler_once(logger, handler)
+
+    return functools.partial(teardown_loggers, logger_names)
