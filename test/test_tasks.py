@@ -1,6 +1,7 @@
 import time
 
 from qgis.core import Qgis
+from qgis.PyQt.QtCore import QCoreApplication, QEventLoop
 
 from ..testing.utilities import SimpleTask, TestTaskRunner
 from ..tools.exceptions import QgsPluginException, TaskInterruptedException
@@ -28,6 +29,10 @@ def test_run_simple_task(task_runner: TestTaskRunner):
 def test_run_simple_task_canceled(task_runner: TestTaskRunner, qgis_iface):
     task = SimpleTask()
     success = task_runner.run_task(task, cancel=True)
+
+    # for some reason this randomly fails if the signal is not waited for
+    QCoreApplication.processEvents(QEventLoop.AllEvents, 100)  # 100 ms wait
+
     messages = qgis_iface.messageBar().get_messages(Qgis.Warning)
 
     assert not success

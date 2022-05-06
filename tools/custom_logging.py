@@ -8,8 +8,9 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from qgis.core import Qgis, QgsMessageLog
+from qgis.core import Qgis, QgsApplication, QgsMessageLog
 from qgis.gui import QgisInterface, QgsMessageBar
+from qgis.PyQt.QtCore import QObject, pyqtSignal, pyqtSlot
 from qgis.PyQt.QtWidgets import QLayout, QVBoxLayout, QWidget
 
 from .i18n import tr
@@ -166,13 +167,40 @@ class QgsMessageBarFilter(logging.Filter):
         return 4
 
 
+class SimpleMessageBarProxy(QObject):
+    """Signal-slot pair to always push messages in the main thread."""
+
+    _emit_message = pyqtSignal(str, str, int, int)
+
+    def __init__(self, msg_bar: Optional[QgsMessageBar] = None) -> None:
+        super().__init__()
+        self._msg_bar = msg_bar
+        self._emit_message.connect(self.push_message)
+
+    def emit_message(self, title: str, text: str, level: int, duration: int) -> None:
+        self._emit_message.emit(title, text, level, duration)
+
+    @pyqtSlot(str, str, int, int)
+    def push_message(self, title: str, text: str, level: int, duration: int) -> None:
+        try:
+            if self._msg_bar is not None:
+                self._msg_bar.pushMessage(
+                    title=title,
+                    text=text,
+                    level=level,
+                    duration=duration,
+                )
+        except Exception:
+            pass
+
+
 class QgsMessageBarHandler(logging.Handler):
     """A logging handler that will log messages to the QGIS message bar."""
 
     def __init__(self, msg_bar: Optional[QgsMessageBar] = None) -> None:
-        self.msg_bar = msg_bar
-
-        logging.Handler.__init__(self)
+        super().__init__()
+        self._message_bar_proxy = SimpleMessageBarProxy(msg_bar)
+        self._message_bar_proxy.moveToThread(QgsApplication.instance().thread())
 
     def emit(self, record: logging.LogRecord) -> None:
         """
@@ -182,17 +210,12 @@ class QgsMessageBarHandler(logging.Handler):
         :param record: logging record enriched with extra information from
             QgsMessageBarFilter
         """
-        try:
-            if self.msg_bar is not None:
-                # noinspection PyArgumentList
-                self.msg_bar.pushMessage(
-                    title=record.message,
-                    text=record.details,  # type: ignore
-                    level=record.qgis_level,  # type: ignore
-                    duration=record.duration,  # type: ignore
-                )
-        except MemoryError:
-            pass  # This is handled in QgsLogHandler
+        self._message_bar_proxy.emit_message(
+            record.message,
+            record.details,  # type: ignore
+            record.qgis_level,  # type: ignore
+            record.duration,  # type: ignore
+        )
 
 
 def add_logging_handler_once(logger: logging.Logger, handler: logging.Handler) -> bool:
