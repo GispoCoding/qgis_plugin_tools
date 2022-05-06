@@ -3,28 +3,26 @@ import sys
 from typing import Any, Dict, Optional
 
 from .custom_logging import bar_msg
-from .resources import plugin_name
-
-LOGGER = logging.getLogger(plugin_name())
 
 
-class MsgBar:
+class MessageBarLogger:
     """
-    This static class is used to log messages to the Qgis message bar.
-    Uses custom_logging.py's QgsMessageBarHandler under the hood.
+    logging.Logger like interface to push messages to the
+    message bar where necessary with info/warning/etc methods.
 
-    bar_msg could be used like this:
-    MsgBar.exception("main message", **bar_msg)
+    Setup with a logger name that has a message bar set.
     """
 
-    KWARGS: Dict[str, Any] = (
-        {}
-        if sys.version_info.major == 3 and sys.version_info.minor < 8
-        else {"stacklevel": 2}
-    )
+    def __init__(self, logger_name: str) -> None:
+        self._logger = logging.getLogger(logger_name)
+        self._logger_kwargs: Dict[str, Any] = (
+            {}
+            if sys.version_info.major == 3 and sys.version_info.minor < 8
+            else {"stacklevel": 2}
+        )
 
-    @staticmethod
     def info(
+        self,
         message: Any,
         details: Any = "",
         duration: Optional[int] = None,
@@ -40,14 +38,16 @@ class MsgBar:
         :param success: Whether the message is success message or not
         """
 
-        LOGGER.info(
-            str(message), extra=bar_msg(details, duration, success), **MsgBar.KWARGS
+        self._logger.info(
+            str(message),
+            extra=bar_msg(details, duration, success),
+            **self._logger_kwargs
         )
         if details != "":
-            LOGGER.info(str(details), **MsgBar.KWARGS)
+            self._logger.info(str(details), **self._logger_kwargs)
 
-    @staticmethod
     def warning(
+        self,
         message: Any,
         details: Any = "",
         duration: Optional[int] = None,
@@ -62,14 +62,16 @@ class MsgBar:
             by the user.
         :param success: Whether the message is success message or not
         """
-        LOGGER.warning(
-            str(message), extra=bar_msg(details, duration, success), **MsgBar.KWARGS
+        self._logger.warning(
+            str(message),
+            extra=bar_msg(details, duration, success),
+            **self._logger_kwargs
         )
         if details != "":
-            LOGGER.warning(str(details), **MsgBar.KWARGS)
+            self._logger.warning(str(details), **self._logger_kwargs)
 
-    @staticmethod
     def error(
+        self,
         message: Any,
         details: Any = "",
         duration: Optional[int] = None,
@@ -85,14 +87,16 @@ class MsgBar:
             by the user.
         :param success: Whether the message is success message or not
         """
-        LOGGER.error(
-            str(message), extra=bar_msg(details, duration, success), **MsgBar.KWARGS
+        self._logger.error(
+            str(message),
+            extra=bar_msg(details, duration, success),
+            **self._logger_kwargs
         )
         if details != "":
-            LOGGER.error(str(details), **MsgBar.KWARGS)
+            self._logger.error(str(details), **self._logger_kwargs)
 
-    @staticmethod
     def exception(
+        self,
         message: Any,
         details: Any = "",
         duration: Optional[int] = None,
@@ -108,8 +112,14 @@ class MsgBar:
             by the user.
         :param success: Whether the message is success message or not
         """
-        LOGGER.exception(
-            str(message), extra=bar_msg(details, duration, success), **MsgBar.KWARGS
+        self._logger.exception(
+            str(message),
+            extra=bar_msg(details, duration, success),
+            **self._logger_kwargs
         )
         if details != "":
-            LOGGER.error(str(details), **MsgBar.KWARGS)
+            self._logger.error(str(details), **self._logger_kwargs)
+
+
+# publish the old MsgBar with the default logger name
+MsgBar = MessageBarLogger(__name__)

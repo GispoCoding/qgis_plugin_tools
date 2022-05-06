@@ -5,7 +5,7 @@ import warnings
 from enum import Enum, unique
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from qgis.core import Qgis, QgsMessageLog
 from qgis.gui import QgisInterface, QgsMessageBar
@@ -14,8 +14,6 @@ from qgis.PyQt.QtWidgets import QLayout, QVBoxLayout, QWidget
 from .i18n import tr
 from .resources import plugin_name, plugin_path, profile_path
 from .settings import get_setting, setting_key
-
-PLUGIN_NAME = plugin_name()
 
 __copyright__ = "Copyright 2020-2021, Gispo Ltd"
 __license__ = "GPL version 3"
@@ -90,8 +88,11 @@ def bar_msg(
 class QgsLogHandler(logging.Handler):
     """A logging handler that will log messages to the QGIS logging console"""
 
-    def __init__(self, level: int = logging.NOTSET) -> None:
-        logging.Handler.__init__(self)
+    def __init__(
+        self, level: int = logging.NOTSET, message_log_name: Optional[str] = None
+    ) -> None:
+        logging.Handler.__init__(self, level)
+        self._message_log_name = message_log_name
 
     def emit(self, record: logging.LogRecord) -> None:
         """Try to log the message to QGIS if available, otherwise do nothing.
@@ -99,19 +100,22 @@ class QgsLogHandler(logging.Handler):
         :param record: logging record containing whatever info needs to be
                 logged.
         """
+        tag_kwargs = (
+            {} if self._message_log_name is None else {"tag": self._message_log_name}
+        )
         try:
             # noinspection PyCallByClass,PyTypeChecker
             QgsMessageLog.logMessage(
-                record.getMessage(), PLUGIN_NAME, qgis_level(record.levelname)
+                record.getMessage(), level=qgis_level(record.levelname), **tag_kwargs
             )
         except MemoryError:
             message = tr(
-                "Due to memory limitations on this machine, the plugin {} can not "
+                "Due to memory limitations on this machine, {} logger can not "
                 "handle the full log"
-            ).format(PLUGIN_NAME)
+            ).format(self._message_log_name)
             # print(message)
             # noinspection PyCallByClass,PyTypeChecker
-            QgsMessageLog.logMessage(message, PLUGIN_NAME, Qgis.Critical)
+            QgsMessageLog.logMessage(message, level=Qgis.Critical, **tag_kwargs)
 
 
 class QgsMessageBarFilter(logging.Filter):
@@ -242,6 +246,60 @@ def get_log_folder() -> Path:
     return log_dir
 
 
+def _create_handlers(
+    message_log_name: str, message_bar: Optional[QgsMessageBar]
+) -> List[logging.Handler]:
+    handlers: List[logging.Handler] = []
+
+    stream_level = get_log_level(LogTarget.STREAM)
+    if stream_level > logging.NOTSET:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(stream_level)
+        console_formatter = logging.Formatter(
+            "%(asctime)s - %(levelname)s - %(message)s", "%d.%m.%Y %H:%M:%S"
+        )
+        console_handler.setFormatter(console_formatter)
+        handlers.append(console_handler)
+
+    file_level = get_log_level(LogTarget.FILE)
+    if file_level > logging.NOTSET:
+        log_file_name = (
+            "".join((c if c.isalnum() else "_") for c in message_log_name) + ".log"
+        )
+        file_handler = RotatingFileHandler(
+            str(get_log_folder() / log_file_name), maxBytes=1024 * 1024 * 2
+        )
+        file_handler.setLevel(file_level)
+        file_formatter = logging.Formatter(
+            "%(asctime)s - [%(levelname)-7s] - %(filename)s:%(lineno)d : %(message)s",
+            "%d.%m.%Y %H:%M:%S",
+        )
+        file_handler.setFormatter(file_formatter)
+        handlers.append(file_handler)
+
+    bar_level = get_log_level(LogTarget.BAR)
+    if bar_level > logging.NOTSET and message_bar is not None:
+        qgis_msg_bar_handler = QgsMessageBarHandler(message_bar)
+        qgis_msg_bar_handler.addFilter(QgsMessageBarFilter())
+        qgis_msg_bar_handler.setLevel(bar_level)
+        handlers.append(qgis_msg_bar_handler)
+
+    # NOTE: NOTSET on handler will match everything, compared to NOTSET
+    # on logger will match nothing. use the lowest active level from
+    # the previous specific logging handlers for the qgis message log handler.
+    # if nothing was enabled, use NOTSET for this handler, and later set logger
+    # to use the lowest level on the handlers returned from this function
+    qgis_message_log_handler = QgsLogHandler(message_log_name=message_log_name)
+    qgis_message_log_handler.setLevel(
+        logging.NOTSET if len(handlers) == 0 else min(h.level for h in handlers)
+    )
+    qgis_message_log_formatter = logging.Formatter("[%(levelname)-7s]- %(message)s")
+    qgis_message_log_handler.setFormatter(qgis_message_log_formatter)
+    handlers.append(qgis_message_log_handler)
+
+    return handlers
+
+
 def setup_logger(  # noqa QGS105
     logger_name: str, iface: Optional[QgisInterface] = None
 ) -> logging.Logger:
@@ -262,38 +320,6 @@ def setup_logger(  # noqa QGS105
        LOGGER.info('Some bar message', extra=bar_msg('details')) # With helper function
     """
 
-    stream_level = get_log_level(LogTarget.STREAM)
-    file_level = get_log_level(LogTarget.FILE)
-    bar_level = get_log_level(LogTarget.BAR)
-
-    logger = logging.getLogger(logger_name)
-    logger.setLevel(min(stream_level, file_level))
-
-    if logger_name != "test_plugin":
-        file_formatter = logging.Formatter(
-            "%(asctime)s - [%(levelname)-7s] - %(filename)s:%(lineno)d : %(message)s",
-            "%d.%m.%Y %H:%M:%S",
-        )
-        file_handler = RotatingFileHandler(
-            str(get_log_folder() / Path(f"{logger_name}.log")), maxBytes=1024 * 1024 * 2
-        )
-        file_handler.setFormatter(file_formatter)
-        file_handler.setLevel(file_level)
-        add_logging_handler_once(logger, file_handler)
-
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(stream_level)
-    console_formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(message)s", "%d.%m.%Y %H:%M:%S"
-    )
-    console_handler.setFormatter(console_formatter)
-    add_logging_handler_once(logger, console_handler)
-
-    qgis_handler = QgsLogHandler()
-    qgis_formatter = logging.Formatter("[%(levelname)-7s]- %(message)s")
-    qgis_handler.setFormatter(qgis_formatter)
-    add_logging_handler_once(logger, qgis_handler)
-
     if iface is None:
         try:
             from qgis.utils import iface  # type: ignore
@@ -301,12 +327,30 @@ def setup_logger(  # noqa QGS105
             iface = None
 
     if iface is not None:
-        qgis_msg_bar_handler = QgsMessageBarHandler(iface.messageBar())
-        qgis_msg_bar_handler.addFilter(QgsMessageBarFilter())
-        qgis_msg_bar_handler.setLevel(bar_level)
-        add_logging_handler_once(logger, qgis_msg_bar_handler)
+        message_bar = iface.messageBar()
+    else:
+        message_bar = None
 
-    return logger
+    # keep api stable and create the handlers as if the passed logger name
+    # was plugin_name()
+    handlers = _create_handlers(plugin_name(), message_bar)
+
+    # if the logger name was plugin_name(), create also the necessary logger for the
+    # qgis_plugin_tools namespace for MsgBar and others to work properly using __name__
+    logger_names = [logger_name]
+    if logger_name == plugin_name():
+        logger_names.append(__name__.removesuffix(".tools.custom_logging"))
+
+    for logger_name in logger_names:
+        logger = logging.getLogger(logger_name)
+
+        # take the lowest level from the enabled handlers
+        logger.setLevel(min(h.level for h in handlers))
+
+        for handler in handlers:
+            add_logging_handler_once(logger, handler)
+
+    return logging.getLogger(logger_name)
 
 
 def add_logger_msg_bar_to_widget(logger_name: str, widget: QWidget) -> None:
@@ -378,3 +422,7 @@ def teardown_logger(logger_name: str) -> None:
     logger = logging.getLogger(logger_name)
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
+
+    # if the logger name was plugin_name(), also clean up the special case logger
+    if logger_name == plugin_name():
+        teardown_logger(__name__.removesuffix(".tools.custom_logging"))

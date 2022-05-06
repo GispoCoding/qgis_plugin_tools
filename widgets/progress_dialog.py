@@ -23,11 +23,11 @@ from qgis.PyQt.QtWidgets import (
 
 from ..tools.decorations import log_if_fails
 from ..tools.i18n import tr
-from ..tools.resources import plugin_name, qgis_plugin_tools_resources
+from ..tools.resources import qgis_plugin_tools_resources
 
 FORM_CLASS: QWidget
 FORM_CLASS, _ = uic.loadUiType(qgis_plugin_tools_resources("ui", "progress_dialog.ui"))
-LOGGER = logging.getLogger(plugin_name())
+LOGGER = logging.getLogger(__name__)
 
 
 class ProgressDialog(QDialog, FORM_CLASS):

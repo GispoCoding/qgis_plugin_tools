@@ -26,7 +26,7 @@ __license__ = "GPL version 3"
 __email__ = "info@gispo.fi"
 __revision__ = "$Format:%H$"
 
-LOGGER = logging.getLogger(plugin_name())
+LOGGER = logging.getLogger(__name__)
 ENCODING = "utf-8"
 CONTENT_DISPOSITION_HEADER = "Content-Disposition"
 CONTENT_DISPOSITION_BYTE_HEADER = QByteArray(

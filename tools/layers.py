@@ -23,14 +23,13 @@ from qgis.core import (
 from .custom_logging import bar_msg
 from .exceptions import QgsPluginExpressionException
 from .i18n import tr
-from .resources import plugin_name
 
 try:
     from qgis.core import QgsUnitTypes, QgsVectorLayerTemporalProperties
 except ImportError:
     QgsVectorLayerTemporalProperties = QgsUnitTypes = None
 
-LOGGER = logging.getLogger(plugin_name())
+LOGGER = logging.getLogger(__name__)
 
 POINT_TYPES = {
     QgsWkbTypes.Point,
