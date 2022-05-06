@@ -1,6 +1,6 @@
 """Tools to work with resource files."""
-
 import configparser
+import sys
 from os.path import abspath, dirname, exists, join, pardir
 from pathlib import Path
 from typing import Dict, Optional
@@ -8,7 +8,9 @@ from typing import Dict, Optional
 from qgis.PyQt import uic
 from qgis.PyQt.QtWidgets import QDialog, QWidget
 
-__copyright__ = "Copyright 2019, 3Liz, 2020-2021 Gispo Ltd"
+__copyright__ = (
+    "Copyright 2019, 3Liz, 2020-2021 Gispo Ltd, 2022 National Land Survey of Finland"
+)
 __license__ = "GPL version 3"
 __email__ = "info@3liz.org"
 __revision__ = "$Format:%H$"
@@ -19,8 +21,50 @@ PLUGIN_NAME: str = ""
 SLUG_NAME: str = ""
 
 
+_TOP_LEVEL_NAME = __name__.split(".", maxsplit=1)[0]
+_IS_SUBMODULE_USAGE = not _TOP_LEVEL_NAME == "qgis_plugin_tools"
+
+
+def _plugin_path_submodule() -> str:
+    # assume qgis_plugin_tools is inside the plugin package,
+    # use the path to the top level module name
+
+    module_file = sys.modules[_TOP_LEVEL_NAME].__file__
+
+    if module_file is not None:
+        path = str(Path(module_file).parent.resolve())
+    else:
+        # maybe possible to have __file__ as none? fall back to default
+        # structure with qgis_plugin_tools directly under plugin package
+        path = dirname(dirname(__file__))
+        path = abspath(abspath(join(path, pardir)))
+
+    return path
+
+
+def _plugin_path_dependency() -> str:
+    # go up the stack until first metadata.txt is found
+    # relative to the calling modules top level package name
+    # probably inefficient, but if the runtime is not a dependency
+    # but a subtree instead this might not need any optimizations?
+    import inspect
+
+    for frame_info in inspect.stack():
+        module_name: Optional[str] = frame_info.frame.f_globals.get("__name__")
+        if module_name is not None:
+            top_level_name, *_ = module_name.split(".", maxsplit=1)
+            top_level_module = sys.modules.get(top_level_name)
+            if top_level_module is not None:
+                top_level_directory = Path(inspect.getfile(top_level_module)).parent
+                if (top_level_directory / "metadata.txt").exists():
+                    return str(top_level_directory)
+
+    # fall back to default directory tree
+    return _plugin_path_submodule()
+
+
 def plugin_path(*args: str) -> str:
-    """Get the path to plugin root folder.
+    """Get the path to plugin package folder.
 
     :param args List of path elements e.g. ['img', 'logos', 'image.png']
     :type args: str
@@ -28,8 +72,11 @@ def plugin_path(*args: str) -> str:
     :return: Absolute path to the resource.
     :rtype: str
     """
-    path = dirname(dirname(__file__))
-    path = abspath(abspath(join(path, pardir)))
+    if _IS_SUBMODULE_USAGE:
+        path = _plugin_path_submodule()
+    else:
+        path = _plugin_path_dependency()
+
     for item in args:
         path = abspath(join(path, item))
 
@@ -39,18 +86,15 @@ def plugin_path(*args: str) -> str:
 def root_path(*args: str) -> str:
     """Get the path to plugin root folder.
 
+    NOTE: the assumed root is the parent of the plugin package folder.
+
     :param args List of path elements e.g. ['img', 'logos', 'image.png']
     :type args: str
 
     :return: Absolute path to the resource.
     :rtype: str
     """
-    path = dirname(dirname(__file__))
-    path = abspath(abspath(join(path, pardir, pardir)))
-    for item in args:
-        path = abspath(join(path, item))
-
-    return path
+    return plugin_path(pardir, *args)
 
 
 def profile_path(*args: str) -> str:
@@ -71,30 +115,46 @@ def plugin_name() -> str:
     :return: The plugin name.
     :rtype: basestring
     """
-    global PLUGIN_NAME
-    if PLUGIN_NAME == "":
-        try:
-            metadata = metadata_config()
-            name: str = metadata["general"]["name"]
-            name = name.replace(" ", "").strip()
-            PLUGIN_NAME = name
-        except KeyError:
-            PLUGIN_NAME = "test_plugin"
-    return PLUGIN_NAME
+    global PLUGIN_NAME, _IS_SUBMODULE_USAGE
+
+    if PLUGIN_NAME != "":
+        return PLUGIN_NAME
+
+    try:
+        metadata = metadata_config()
+        name: str = metadata["general"]["name"]
+        name = name.replace(" ", "").strip()
+    except KeyError:
+        name = "test_plugin"
+
+    # if qgis plugin tools is run as a dependency, global var cannot be set
+    # since it might confuse multiple plugins in the same env using this fn
+    if not _IS_SUBMODULE_USAGE:
+        PLUGIN_NAME = name
+
+    return name
 
 
 def slug_name() -> str:
     """Return project slug name in .qgis-plugin.ci"""
-    global SLUG_NAME
-    if SLUG_NAME == "":
-        try:
-            metadata = metadata_config()
-            name: str = metadata["general"]["repository"]
-            slug = name.split("/")[-1]
-            SLUG_NAME = slug
-        except KeyError:
-            SLUG_NAME = PLUGIN_NAME
-    return SLUG_NAME
+    global SLUG_NAME, _IS_SUBMODULE_USAGE
+
+    if SLUG_NAME != "":
+        return SLUG_NAME
+
+    try:
+        metadata = metadata_config()
+        name: str = metadata["general"]["repository"]
+        slug = name.split("/")[-1]
+    except KeyError:
+        slug = plugin_name()
+
+    # if qgis plugin tools is run as a dependency, global var cannot be set
+    # since it might confuse multiple plugins in the same env using this fn
+    if not _IS_SUBMODULE_USAGE:
+        SLUG_NAME = slug
+
+    return slug
 
 
 def task_logger_name() -> str:
