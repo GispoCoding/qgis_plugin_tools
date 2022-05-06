@@ -2,7 +2,6 @@
 
 import functools
 import logging
-import warnings
 from enum import Enum, unique
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -413,29 +412,6 @@ def use_custom_msg_bar_in_logger(logger_name: str, msg_bar: QgsMessageBar) -> No
     qgis_msg_bar_handler.addFilter(QgsMessageBarFilter())
     qgis_msg_bar_handler.setLevel(bar_level)
     add_logging_handler_once(logger, qgis_msg_bar_handler)
-
-
-def setup_task_logger(logger_name: str) -> logging.Logger:
-    """Run once when the module is loaded and enable logging during tasks.
-
-    :param logger_name: The logger name that we want to set up.
-    """
-
-    warnings.warn(
-        "setup_task_logger() will be deprecated. Use setup_logger() instead.",
-        PendingDeprecationWarning,
-    )
-    stream_level = get_log_level(LogTarget.STREAM)
-    logger = logging.getLogger(f"{logger_name}_task")
-    logger.setLevel(stream_level)
-    logger.handlers = []
-
-    qgis_handler = QgsLogHandler()
-    qgis_formatter = logging.Formatter("[%(levelname)-7s]- %(message)s")
-    qgis_handler.setFormatter(qgis_formatter)
-    add_logging_handler_once(logger, qgis_handler)
-
-    return logger
 
 
 def teardown_logger(logger_name: str) -> None:
