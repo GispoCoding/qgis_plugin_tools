@@ -362,7 +362,7 @@ def setup_logger(  # noqa QGS105
     # qgis_plugin_tools namespace for MsgBar and others to work properly using __name__
     logger_names = [logger_name]
     if logger_name == plugin_name():
-        logger_names.append(__name__.removesuffix(".tools.custom_logging"))
+        logger_names.append(__name__.replace(".tools.custom_logging", "", 1))
 
     for logger_name in logger_names:
         logger = logging.getLogger(logger_name)
@@ -425,7 +425,7 @@ def teardown_logger(logger_name: str) -> None:
 
     # if the logger name was plugin_name(), also clean up the special case logger
     if logger_name == plugin_name():
-        teardown_logger(__name__.removesuffix(".tools.custom_logging"))
+        teardown_logger(__name__.replace(".tools.custom_logging", "", 1))
 
 
 def teardown_loggers(logger_names: List[str]) -> None:
