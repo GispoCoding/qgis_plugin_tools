@@ -4,6 +4,7 @@ __email__ = "info@gispo.fi"
 __revision__ = "$Format:%H$"
 
 import json
+
 import pytest
 
 from ..tools.exceptions import QgsPluginNetworkException

@@ -48,7 +48,6 @@ def fetch(
     :param encoding: Encoding which will be used to decode the bytes
     :param authcfg_id: authcfg id from QGIS settings, defaults to ''
     :param params: Dictionary to send in the query string
-    :param params: Dictionary to send in the request body
     :return: encoded string of the content
     """
     content, _ = fetch_raw(url, encoding, authcfg_id, params)
@@ -59,8 +58,7 @@ def post(
     url: str,
     encoding: str = ENCODING,
     authcfg_id: str = "",
-    params: Optional[Dict[str, str]] = None,
-    data: Optional[Dict[str, str]] = None
+    data: Optional[Dict[str, str]] = None,
 ) -> str:
     """
     Post resource. Similar to requests.post(url, data) but is
@@ -68,14 +66,19 @@ def post(
     :param url: address of the web resource
     :param encoding: Encoding which will be used to decode the bytes
     :param authcfg_id: authcfg id from QGIS settings, defaults to ''
-    :param params: Dictionary to send in the query string
+    :param data: Dictionary to send in the request body
     :return: encoded string of the content
     """
-    content, _ = post_raw(url, encoding, authcfg_id, params, data)
+    content, _ = post_raw(url, encoding, authcfg_id, data)
     return content.decode(ENCODING)
 
 
-def fetch_raw(url, encoding, authcfg_id, params):
+def fetch_raw(
+    url: str,
+    encoding: str = ENCODING,
+    authcfg_id: str = "",
+    params: Optional[Dict[str, str]] = None,
+) -> Tuple[bytes, str]:
     """
     Fetch resource from the internet. Similar to requests.get(url) but is
     recommended way of handling requests in QGIS plugin
@@ -85,26 +88,30 @@ def fetch_raw(url, encoding, authcfg_id, params):
     :param params: Dictionary to send in the query string
     :return: bytes of the content and default name of the file or empty string
     """
-    return request_raw(url, 'get', encoding, authcfg_id, params)
+    return request_raw(url, "get", encoding, authcfg_id, params)
 
 
-def post_raw(url, encoding, authcfg_id, params, data = None):
+def post_raw(
+    url: str,
+    encoding: str = ENCODING,
+    authcfg_id: str = "",
+    data: Optional[Dict[str, str]] = None,
+) -> Tuple[bytes, str]:
     """
     Post resource. Similar to requests.post(url, data) but is
     recommended way of handling requests in QGIS plugin
     :param url: address of the web resource
     :param encoding: Encoding which will be used to decode the bytes
     :param authcfg_id: authcfg id from QGIS settings, defaults to ''
-    :param params: Dictionary to send in the query string
-    :param params: Dictionary to send in the request body
+    :param data: Dictionary to send in the request body
     :return: bytes of the content and default name of the file or empty string
     """
-    return request_raw(url, 'post', encoding, authcfg_id, params, data)
+    return request_raw(url, "post", encoding, authcfg_id, None, data)
 
 
 def request_raw(
     url: str,
-    method: str = 'get',
+    method: str = "get",
     encoding: str = ENCODING,
     authcfg_id: str = "",
     params: Optional[Dict[str, str]] = None,
@@ -118,7 +125,7 @@ def request_raw(
     :param encoding: Encoding which will be used to decode the bytes
     :param authcfg_id: authcfg id from QGIS settings, defaults to ''
     :param params: Dictionary to send in the query string
-    :param params: Dictionary to send in the request body
+    :param data: Dictionary to send in the request body
     :return: bytes of the content and default name of the file or empty string
     """
     if params:
@@ -137,9 +144,9 @@ def request_raw(
     if authcfg_id:
         request_blocking.setAuthCfg(authcfg_id)
     # QNetworkRequest *only* supports get and post. No idea why.
-    if method == 'get':
+    if method == "get":
         _ = request_blocking.get(req)
-    elif method == 'post':
+    elif method == "post":
         # Only support JSON content type atm
         if data:
             data = bytes(json.dumps(data), encoding)
