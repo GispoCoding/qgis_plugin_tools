@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        docker_tags: [ release-3_16 ]
+        docker_tags: [ release-3_16, release-3_22 ]
       fail-fast: false
 
     # Steps represent a sequence of tasks that will be executed as part of the job
