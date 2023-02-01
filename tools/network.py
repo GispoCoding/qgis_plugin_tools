@@ -149,9 +149,9 @@ def request_raw(
     elif method == "post":
         # Only support JSON content type atm
         if data:
-            data = bytes(json.dumps(data), encoding)
+            byte_data = bytes(json.dumps(data), encoding)
         req.setRawHeader(b"Content-Type", bytes("application/json", encoding))
-        _ = request_blocking.post(req, data)
+        _ = request_blocking.post(req, byte_data)
     else:
         raise Exception(f"Request method {method} not supported.")
     reply: QgsNetworkReplyContent = request_blocking.reply()
