@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 import shutil
@@ -21,7 +22,7 @@ except ImportError:
     requests = None  # type: ignore
     RequestException = None  # type: ignore
 
-__copyright__ = "Copyright 2020-2021, Gispo Ltd"
+__copyright__ = "Copyright 2020-2023, Gispo Ltd"
 __license__ = "GPL version 3"
 __email__ = "info@gispo.fi"
 __revision__ = "$Format:%H$"
@@ -47,18 +48,34 @@ def fetch(
     :param encoding: Encoding which will be used to decode the bytes
     :param authcfg_id: authcfg id from QGIS settings, defaults to ''
     :param params: Dictionary to send in the query string
+    :param params: Dictionary to send in the request body
     :return: encoded string of the content
     """
     content, _ = fetch_raw(url, encoding, authcfg_id, params)
     return content.decode(ENCODING)
 
 
-def fetch_raw(
+def post(
     url: str,
     encoding: str = ENCODING,
     authcfg_id: str = "",
     params: Optional[Dict[str, str]] = None,
-) -> Tuple[bytes, str]:
+    data: Optional[Dict[str, str]] = None
+) -> str:
+    """
+    Post resource. Similar to requests.post(url, data) but is
+    recommended way of handling requests in QGIS plugin
+    :param url: address of the web resource
+    :param encoding: Encoding which will be used to decode the bytes
+    :param authcfg_id: authcfg id from QGIS settings, defaults to ''
+    :param params: Dictionary to send in the query string
+    :return: encoded string of the content
+    """
+    content, _ = post_raw(url, encoding, authcfg_id, params, data)
+    return content.decode(ENCODING)
+
+
+def fetch_raw(url, encoding, authcfg_id, params):
     """
     Fetch resource from the internet. Similar to requests.get(url) but is
     recommended way of handling requests in QGIS plugin
@@ -66,6 +83,42 @@ def fetch_raw(
     :param encoding: Encoding which will be used to decode the bytes
     :param authcfg_id: authcfg id from QGIS settings, defaults to ''
     :param params: Dictionary to send in the query string
+    :return: bytes of the content and default name of the file or empty string
+    """
+    return request_raw(url, 'get', encoding, authcfg_id, params)
+
+
+def post_raw(url, encoding, authcfg_id, params, data = None):
+    """
+    Post resource. Similar to requests.post(url, data) but is
+    recommended way of handling requests in QGIS plugin
+    :param url: address of the web resource
+    :param encoding: Encoding which will be used to decode the bytes
+    :param authcfg_id: authcfg id from QGIS settings, defaults to ''
+    :param params: Dictionary to send in the query string
+    :param params: Dictionary to send in the request body
+    :return: bytes of the content and default name of the file or empty string
+    """
+    return request_raw(url, 'post', encoding, authcfg_id, params, data)
+
+
+def request_raw(
+    url: str,
+    method: str = 'get',
+    encoding: str = ENCODING,
+    authcfg_id: str = "",
+    params: Optional[Dict[str, str]] = None,
+    data: Optional[Dict[str, str]] = None,
+) -> Tuple[bytes, str]:
+    """
+    Request resource from the internet. Similar to requests.get(url) and
+    requests.post(url, data) but is recommended way of handling requests in QGIS plugin
+    :param url: address of the web resource
+    :param method: method to use, defaults to 'get'
+    :param encoding: Encoding which will be used to decode the bytes
+    :param authcfg_id: authcfg id from QGIS settings, defaults to ''
+    :param params: Dictionary to send in the query string
+    :param params: Dictionary to send in the request body
     :return: bytes of the content and default name of the file or empty string
     """
     if params:
@@ -83,7 +136,17 @@ def fetch_raw(
     request_blocking = QgsBlockingNetworkRequest()
     if authcfg_id:
         request_blocking.setAuthCfg(authcfg_id)
-    _ = request_blocking.get(req)
+    # QNetworkRequest *only* supports get and post. No idea why.
+    if method == 'get':
+        _ = request_blocking.get(req)
+    elif method == 'post':
+        # Only support JSON content type atm
+        if data:
+            data = bytes(json.dumps(data), encoding)
+        req.setRawHeader(b"Content-Type", bytes("application/json", encoding))
+        _ = request_blocking.post(req, data)
+    else:
+        raise Exception(f"Request method {method} not supported.")
     reply: QgsNetworkReplyContent = request_blocking.reply()
     reply_error = reply.error()
     if reply_error != QNetworkReply.NoError:

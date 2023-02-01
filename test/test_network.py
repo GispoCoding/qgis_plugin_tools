@@ -3,15 +3,17 @@ __license__ = "GPL version 3"
 __email__ = "info@gispo.fi"
 __revision__ = "$Format:%H$"
 
+import json
 import pytest
 
 from ..tools.exceptions import QgsPluginNetworkException
-from ..tools.network import download_to_file, fetch
+from ..tools.network import download_to_file, fetch, post
 
 
 def test_fetch(qgis_new_project):
-    data_model = fetch("https://www.gispo.fi/")
-    assert len(data_model) > 10000
+    data = fetch("https://httpbin.org/get")
+    data = json.loads(data)
+    assert data["url"] == "https://httpbin.org/get"
 
 
 def test_fetch_invalid_url(qgis_new_project):
@@ -20,8 +22,28 @@ def test_fetch_invalid_url(qgis_new_project):
 
 
 def test_fetch_params(qgis_new_project):
-    data_model = fetch("https://www.gispo.fi/", params={"foo": "bar"})
-    assert len(data_model) > 10000
+    data = fetch("https://httpbin.org/get", params={"foo": "bar"})
+    data = json.loads(data)
+    assert data["url"] == "https://httpbin.org/get?foo=bar"
+    assert data["args"] == {"foo": "bar"}
+
+
+def test_post(qgis_new_project):
+    data = post("https://httpbin.org/post")
+    data = json.loads(data)
+    assert data["url"] == "https://httpbin.org/post"
+
+
+def test_post_invalid_url(qgis_new_project):
+    with pytest.raises(QgsPluginNetworkException):
+        post("invalidurl")
+
+
+def test_post_data(qgis_new_project):
+    data = post("https://httpbin.org/post", data={"foo": "bar"})
+    data = json.loads(data)
+    assert data["url"] == "https://httpbin.org/post"
+    assert data["data"] == json.dumps({"foo": "bar"})
 
 
 @pytest.mark.skip(
