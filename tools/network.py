@@ -148,8 +148,7 @@ def request_raw(
         _ = request_blocking.get(req)
     elif method == "post":
         # Only support JSON content type atm
-        if data:
-            byte_data = bytes(json.dumps(data), encoding)
+        byte_data = bytes(json.dumps(data), encoding)
         req.setRawHeader(b"Content-Type", bytes("application/json", encoding))
         _ = request_blocking.post(req, byte_data)
     else:
