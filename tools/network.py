@@ -183,7 +183,7 @@ def request_raw(
                 bytes(f"multipart/form-data; boundary={boundary}", encoding),
             )
         else:
-            byte_data = None
+            byte_data = b""
         _ = request_blocking.post(req, byte_data)
     else:
         raise Exception(f"Request method {method} not supported.")
