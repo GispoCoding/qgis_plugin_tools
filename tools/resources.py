@@ -1,5 +1,6 @@
 """Tools to work with resource files."""
 import configparser
+import importlib.resources
 import sys
 from os.path import abspath, dirname, exists, join, pardir
 from pathlib import Path
@@ -275,3 +276,30 @@ def ui_file_dialog(*ui_file_name_parts: str):  # noqa ANN201
             self.setupUi(self)  # provided by load_ui FORM_CLASS
 
     return UiFileDialogClass
+
+
+def package_file(package: importlib.resources.Package, file_name: str) -> Path:
+    """
+    Safely access a file in the package hierarchy. This will
+    ensure the requested file actually exists on the file system
+    outside the contextmanager, so that the file can be still
+    accessed with the path on demand later.
+
+    Use like importlib.resources, provide a package (module or string)
+    and file name/path inside the package.
+    """
+
+    with importlib.resources.as_file(
+        importlib.resources.files(package).joinpath(file_name)
+    ) as requested_path:
+        if not requested_path.is_file():
+            raise FileNotFoundError(
+                f"requested file {file_name} not found in {package}"
+            )
+
+    if not requested_path.is_file():
+        raise FileNotFoundError(
+            "requested file would be available only as a temporary resource"
+        )
+
+    return requested_path
