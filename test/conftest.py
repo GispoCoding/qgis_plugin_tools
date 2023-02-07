@@ -30,3 +30,9 @@ def initialize_logger(qgis_iface):
 @pytest.fixture()
 def task_runner(initialize_logger):
     return TestTaskRunner()
+
+
+@pytest.fixture()
+def file_fixture() -> bytes:
+    with open("test/fixtures/file.xml", "rb") as f:
+        yield f.read()

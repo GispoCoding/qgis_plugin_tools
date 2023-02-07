@@ -47,6 +47,14 @@ def test_post_data(qgis_new_project):
     assert data["data"] == json.dumps({"foo": "bar"})
 
 
+def test_upload_file(qgis_new_project, file_fixture):
+    data = post("https://httpbin.org/post", files={"file": file_fixture})
+    data = json.loads(data)
+    assert data["url"] == "https://httpbin.org/post"
+    assert data["files"]
+    assert bytes(data["files"]["file"], "utf-8") == file_fixture
+
+
 @pytest.mark.skip(
     "file does not exist. "
     "TODO: search another file to be used using Content-Disposition"

@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 from urllib.parse import urlencode
+from uuid import uuid4
 
 from qgis.core import Qgis, QgsBlockingNetworkRequest, QgsNetworkReplyContent
 from qgis.PyQt.QtCore import QByteArray, QSettings, QUrl
@@ -33,6 +34,10 @@ CONTENT_DISPOSITION_HEADER = "Content-Disposition"
 CONTENT_DISPOSITION_BYTE_HEADER = QByteArray(
     bytes(CONTENT_DISPOSITION_HEADER, ENCODING)
 )
+CONTENT_DISPOSITION_FORM_DATA = (
+    'Content-Disposition: form-data; name="file"; filename="file.xml"\r\n'
+)
+CONTENT_TYPE_FORM_DATA = "Content-Type: text/xml\r\n\r\n"
 
 
 def fetch(
@@ -59,6 +64,7 @@ def post(
     encoding: str = ENCODING,
     authcfg_id: str = "",
     data: Optional[Dict[str, str]] = None,
+    files: Optional[Dict[str, bytes]] = None,
 ) -> str:
     """
     Post resource. Similar to requests.post(url, data) but is
@@ -67,9 +73,10 @@ def post(
     :param encoding: Encoding which will be used to decode the bytes
     :param authcfg_id: authcfg id from QGIS settings, defaults to ''
     :param data: Dictionary to send in the request body
+    :param files: Files to send multipart-encoded
     :return: encoded string of the content
     """
-    content, _ = post_raw(url, encoding, authcfg_id, data)
+    content, _ = post_raw(url, encoding, authcfg_id, data, files)
     return content.decode(ENCODING)
 
 
@@ -96,6 +103,7 @@ def post_raw(
     encoding: str = ENCODING,
     authcfg_id: str = "",
     data: Optional[Dict[str, str]] = None,
+    files: Optional[Dict[str, bytes]] = None,
 ) -> Tuple[bytes, str]:
     """
     Post resource. Similar to requests.post(url, data) but is
@@ -104,9 +112,10 @@ def post_raw(
     :param encoding: Encoding which will be used to decode the bytes
     :param authcfg_id: authcfg id from QGIS settings, defaults to ''
     :param data: Dictionary to send in the request body
+    :param files: Files to send multipart-encoded
     :return: bytes of the content and default name of the file or empty string
     """
-    return request_raw(url, "post", encoding, authcfg_id, None, data)
+    return request_raw(url, "post", encoding, authcfg_id, None, data, files)
 
 
 def request_raw(
@@ -116,6 +125,7 @@ def request_raw(
     authcfg_id: str = "",
     params: Optional[Dict[str, str]] = None,
     data: Optional[Dict[str, str]] = None,
+    files: Optional[Dict[str, bytes]] = None,
 ) -> Tuple[bytes, str]:
     """
     Request resource from the internet. Similar to requests.get(url) and
@@ -126,6 +136,7 @@ def request_raw(
     :param authcfg_id: authcfg id from QGIS settings, defaults to ''
     :param params: Dictionary to send in the query string
     :param data: Dictionary to send in the request body
+    :param files: Files to send multipart-encoded
     :return: bytes of the content and default name of the file or empty string
     """
     if params:
@@ -147,9 +158,32 @@ def request_raw(
     if method == "get":
         _ = request_blocking.get(req)
     elif method == "post":
-        # Only support JSON content type atm
-        byte_data = bytes(json.dumps(data), encoding)
-        req.setRawHeader(b"Content-Type", bytes("application/json", encoding))
+        if data:
+            # Support JSON
+            byte_data = bytes(json.dumps(data), encoding)
+            req.setRawHeader(b"Content-Type", bytes("application/json", encoding))
+        elif files:
+            # Support multipart binary. Generate boundary like
+            # https://github.com/requests/toolbelt/blob/master/requests_toolbelt/multipart/encoder.py
+            boundary = uuid4().hex
+            byte_boundary = bytes(f"\r\n--{boundary}\r\n", encoding)
+            last_byte_boundary = bytes(f"\r\n--{boundary}--\r\n", encoding)
+            byte_boundary_with_disposition = (
+                byte_boundary
+                + bytes(CONTENT_DISPOSITION_FORM_DATA, encoding)
+                + bytes(CONTENT_TYPE_FORM_DATA, encoding)
+            )
+            byte_data = (
+                byte_boundary_with_disposition
+                + byte_boundary_with_disposition.join(files.values())
+                + last_byte_boundary
+            )
+            req.setRawHeader(
+                b"Content-Type",
+                bytes(f"multipart/form-data; boundary={boundary}", encoding),
+            )
+        else:
+            byte_data = None
         _ = request_blocking.post(req, byte_data)
     else:
         raise Exception(f"Request method {method} not supported.")
