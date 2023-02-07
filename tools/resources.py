@@ -131,7 +131,7 @@ def plugin_name() -> str:
 
     # if qgis plugin tools is run as a dependency, global var cannot be set
     # since it might confuse multiple plugins in the same env using this fn
-    if not _IS_SUBMODULE_USAGE:
+    if _IS_SUBMODULE_USAGE:
         PLUGIN_NAME = name
 
     return name
@@ -167,7 +167,7 @@ def slug_name() -> str:
 
     # if qgis plugin tools is run as a dependency, global var cannot be set
     # since it might confuse multiple plugins in the same env using this fn
-    if not _IS_SUBMODULE_USAGE:
+    if _IS_SUBMODULE_USAGE:
         SLUG_NAME = slug
 
     return slug
