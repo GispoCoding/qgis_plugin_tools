@@ -6,8 +6,9 @@ __license__ = "GPL version 3"
 __email__ = "info@gispo.fi"
 __revision__ = "$Format:%H$"
 
-import pytest
 from typing import Tuple
+
+import pytest
 
 from ..testing.utilities import TestTaskRunner
 from ..tools.custom_logging import (

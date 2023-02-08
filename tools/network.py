@@ -3,7 +3,7 @@ import logging
 import re
 import shutil
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Literal, NamedTuple, Optional, Tuple
 from urllib.parse import urlencode
 from uuid import uuid4
 
@@ -35,13 +35,14 @@ CONTENT_DISPOSITION_BYTE_HEADER = QByteArray(
     bytes(CONTENT_DISPOSITION_HEADER, ENCODING)
 )
 
-def FileInfo(NamedTuple):
+
+class FileInfo(NamedTuple):
     file_name: str
     content: bytes
     content_type: str
 
 
-def FileField(NamedTuple):
+class FileField(NamedTuple):
     field_name: str
     file_info: FileInfo
 
@@ -126,7 +127,7 @@ def post_raw(
 
 def request_raw(
     url: str,
-    method: str = "get",
+    method: Literal["get", "post"] = "get",
     encoding: str = ENCODING,
     authcfg_id: str = "",
     params: Optional[Dict[str, str]] = None,
@@ -167,7 +168,10 @@ def request_raw(
         if data:
             # Support JSON
             byte_data = bytes(json.dumps(data), encoding)
-            req.setRawHeader(b"Content-Type", bytes("application/json", encoding))
+            req.setRawHeader(
+                b"Content-Type",
+                bytes(f"application/json; charset={encoding}", encoding),
+            )
         elif files:
             # Support multipart binary. Generate boundary like
             # https://github.com/requests/toolbelt/blob/master/requests_toolbelt/multipart/encoder.py
@@ -184,9 +188,11 @@ def request_raw(
                 content = file_info[1]
                 content_type = file_info[2]
                 content_disposition_form_data = (
-                    f'Content-Disposition: form-data; name="{name}"; filename="{file_name}"\r\n'
+                    f"Content-Disposition: form-data;"
+                    f' name="{name}";'
+                    f' filename="{file_name}"\r\n'
                 )
-                content_type_form_data = f'Content-Type: {content_type}\r\n\r\n'
+                content_type_form_data = f"Content-Type: {content_type}\r\n\r\n"
                 byte_boundary_with_headers = (
                     byte_boundary
                     + bytes(content_disposition_form_data, encoding)

@@ -49,7 +49,10 @@ def test_post_data(qgis_new_project):
 
 def test_upload_file(qgis_new_project, file_fixture):
     file_name, file_content, file_type = file_fixture
-    data = post("https://httpbin.org/post", files=[("file", (file_name, file_content, file_type))])
+    data = post(
+        "https://httpbin.org/post",
+        files=[("file", (file_name, file_content, file_type))],
+    )
     data = json.loads(data)
     assert data["url"] == "https://httpbin.org/post"
     assert data["files"]
@@ -59,7 +62,16 @@ def test_upload_file(qgis_new_project, file_fixture):
 def test_upload_multiple_files(qgis_new_project, file_fixture, another_file_fixture):
     file_name, file_content, file_type = file_fixture
     another_file_name, another_file_content, another_file_type = another_file_fixture
-    data = post("https://httpbin.org/post", files=[("file", (file_name, file_content, file_type)), ("another_file", (another_file_name, another_file_content, another_file_type))])
+    data = post(
+        "https://httpbin.org/post",
+        files=[
+            ("file", (file_name, file_content, file_type)),
+            (
+                "another_file",
+                (another_file_name, another_file_content, another_file_type),
+            ),
+        ],
+    )
     data = json.loads(data)
     assert data["url"] == "https://httpbin.org/post"
     assert data["files"]
