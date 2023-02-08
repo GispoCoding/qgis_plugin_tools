@@ -18,24 +18,25 @@ jobs:
   test:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
+    container:
+      image: qgis/qgis:${{ matrix.qgis-image-tag }}
     strategy:
       matrix:
-        docker_tags: [ release-3_16, release-3_22, release-3_28 ]
+        qgis-image-tag:
+          - release-3_16
+          - release-3_22
+          - release-3_28
       fail-fast: false
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-
-      - name: Pull qgis LTR image
-        run: docker pull qgis/qgis:${{ matrix.docker_tags }}
-
-      # Runs all tests
-      - name: Run tests
-        run: >
-          docker run --rm --net=host --volume `pwd`:/app -w=/app -e QGIS_PLUGIN_IN_CI=1 -e QGIS_PLUGIN_TOOLS_IN_CI=1
-          qgis/qgis:${{ matrix.docker_tags }} sh -c
-          "pip3 install -qr requirements-dev.txt && xvfb-run -s '+extension GLX -screen 0 1024x768x24' pytest -v"
+      - uses: actions/checkout@v3
+      - run: |
+          pip3 install -qr requirements-dev.txt
+      - run: |
+          pytest -v
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QGIS_PLUGIN_IN_CI: 1
+          QGIS_PLUGIN_TOOLS_IN_CI: 1
