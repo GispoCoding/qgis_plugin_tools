@@ -3,7 +3,7 @@ import logging
 import re
 import shutil
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlencode
 from uuid import uuid4
 
@@ -34,10 +34,16 @@ CONTENT_DISPOSITION_HEADER = "Content-Disposition"
 CONTENT_DISPOSITION_BYTE_HEADER = QByteArray(
     bytes(CONTENT_DISPOSITION_HEADER, ENCODING)
 )
-CONTENT_DISPOSITION_FORM_DATA = (
-    'Content-Disposition: form-data; name="file"; filename="file.xml"\r\n'
-)
-CONTENT_TYPE_FORM_DATA = "Content-Type: text/xml\r\n\r\n"
+
+def FileInfo(NamedTuple):
+    file_name: str
+    content: bytes
+    content_type: str
+
+
+def FileField(NamedTuple):
+    field_name: str
+    file_info: FileInfo
 
 
 def fetch(
@@ -64,16 +70,16 @@ def post(
     encoding: str = ENCODING,
     authcfg_id: str = "",
     data: Optional[Dict[str, str]] = None,
-    files: Optional[Dict[str, bytes]] = None,
+    files: Optional[List[FileField]] = None,
 ) -> str:
     """
-    Post resource. Similar to requests.post(url, data) but is
+    Post resource. Similar to requests.post(url, data, files) but is
     recommended way of handling requests in QGIS plugin
     :param url: address of the web resource
     :param encoding: Encoding which will be used to decode the bytes
     :param authcfg_id: authcfg id from QGIS settings, defaults to ''
     :param data: Dictionary to send in the request body
-    :param files: Files to send multipart-encoded
+    :param files: Files to send multipart-encoded. Same format as requests.
     :return: encoded string of the content
     """
     content, _ = post_raw(url, encoding, authcfg_id, data, files)
@@ -103,16 +109,16 @@ def post_raw(
     encoding: str = ENCODING,
     authcfg_id: str = "",
     data: Optional[Dict[str, str]] = None,
-    files: Optional[Dict[str, bytes]] = None,
+    files: Optional[List[FileField]] = None,
 ) -> Tuple[bytes, str]:
     """
-    Post resource. Similar to requests.post(url, data) but is
+    Post resource. Similar to requests.post(url, data, files) but is
     recommended way of handling requests in QGIS plugin
     :param url: address of the web resource
     :param encoding: Encoding which will be used to decode the bytes
     :param authcfg_id: authcfg id from QGIS settings, defaults to ''
     :param data: Dictionary to send in the request body
-    :param files: Files to send multipart-encoded
+    :param files: Files to send multipart-encoded. Same format as requests.
     :return: bytes of the content and default name of the file or empty string
     """
     return request_raw(url, "post", encoding, authcfg_id, None, data, files)
@@ -125,7 +131,7 @@ def request_raw(
     authcfg_id: str = "",
     params: Optional[Dict[str, str]] = None,
     data: Optional[Dict[str, str]] = None,
-    files: Optional[Dict[str, bytes]] = None,
+    files: Optional[List[FileField]] = None,
 ) -> Tuple[bytes, str]:
     """
     Request resource from the internet. Similar to requests.get(url) and
@@ -136,7 +142,7 @@ def request_raw(
     :param authcfg_id: authcfg id from QGIS settings, defaults to ''
     :param params: Dictionary to send in the query string
     :param data: Dictionary to send in the request body
-    :param files: Files to send multipart-encoded
+    :param files: Files to send multipart-encoded. Same format as requests.
     :return: bytes of the content and default name of the file or empty string
     """
     if params:
@@ -168,16 +174,26 @@ def request_raw(
             boundary = uuid4().hex
             byte_boundary = bytes(f"\r\n--{boundary}\r\n", encoding)
             last_byte_boundary = bytes(f"\r\n--{boundary}--\r\n", encoding)
-            byte_boundary_with_disposition = (
-                byte_boundary
-                + bytes(CONTENT_DISPOSITION_FORM_DATA, encoding)
-                + bytes(CONTENT_TYPE_FORM_DATA, encoding)
-            )
-            byte_data = (
-                byte_boundary_with_disposition
-                + byte_boundary_with_disposition.join(files.values())
-                + last_byte_boundary
-            )
+
+            # each file may have different content type, name and filename
+            byte_data = b""
+            for file_field in files:
+                name = file_field[0]
+                file_info = file_field[1]
+                file_name = file_info[0]
+                content = file_info[1]
+                content_type = file_info[2]
+                content_disposition_form_data = (
+                    f'Content-Disposition: form-data; name="{name}"; filename="{file_name}"\r\n'
+                )
+                content_type_form_data = f'Content-Type: {content_type}\r\n\r\n'
+                byte_boundary_with_headers = (
+                    byte_boundary
+                    + bytes(content_disposition_form_data, encoding)
+                    + bytes(content_type_form_data, encoding)
+                )
+                byte_data += byte_boundary_with_headers + content
+            byte_data += last_byte_boundary
             req.setRawHeader(
                 b"Content-Type",
                 bytes(f"multipart/form-data; boundary={boundary}", encoding),

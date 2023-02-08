@@ -7,6 +7,7 @@ __email__ = "info@gispo.fi"
 __revision__ = "$Format:%H$"
 
 import pytest
+from typing import Tuple
 
 from ..testing.utilities import TestTaskRunner
 from ..tools.custom_logging import (
@@ -33,6 +34,12 @@ def task_runner(initialize_logger):
 
 
 @pytest.fixture()
-def file_fixture() -> bytes:
+def file_fixture() -> Tuple[str, bytes, str]:
     with open("test/fixtures/file.xml", "rb") as f:
-        yield f.read()
+        yield "file.xml", f.read(), "text/xml"
+
+
+@pytest.fixture()
+def another_file_fixture() -> Tuple[str, bytes, str]:
+    with open("test/fixtures/text.txt", "rb") as f:
+        yield "text.txt", f.read(), "text/plain"
