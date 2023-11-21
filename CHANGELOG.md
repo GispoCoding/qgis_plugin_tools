@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fix: Recover from `TypeError` when getting plugin path (when using pytest-xdist)
+
 ## [0.3.1] - 2023-08-08
 
 - Feature: Add `exc_info` and `stack_info` parameters to message bar logger for capturing exception.

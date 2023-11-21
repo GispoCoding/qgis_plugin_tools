@@ -10,7 +10,8 @@ from qgis.PyQt import uic
 from qgis.PyQt.QtWidgets import QDialog, QWidget
 
 __copyright__ = (
-    "Copyright 2019, 3Liz, 2020-2021 Gispo Ltd, 2022 National Land Survey of Finland"
+    "Copyright 2019, 3Liz, 2020-2021 Gispo Ltd, "
+    "2022-2023 National Land Survey of Finland"
 )
 __license__ = "GPL version 3"
 __email__ = "info@3liz.org"
@@ -56,7 +57,16 @@ def _plugin_path_dependency() -> str:
             top_level_name, *_ = module_name.split(".", maxsplit=1)
             top_level_module = sys.modules.get(top_level_name)
             if top_level_module is not None:
-                top_level_directory = Path(inspect.getfile(top_level_module)).parent
+                try:
+                    top_level_directory = Path(inspect.getfile(top_level_module)).parent
+                except TypeError:
+                    # TypeError gets thrown if
+                    # pytest-xdist is used in tests since it
+                    # adds <module '__main__' (built-in)> into stack
+                    # The 'getfile' function throws a TypeError for built-in modules.
+                    # We are only interested in custom modules, so it is safe to ignore
+                    # the error.
+                    continue
                 if (top_level_directory / "metadata.txt").exists():
                     return str(top_level_directory)
 
