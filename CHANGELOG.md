@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Feat: Support custom logger names for `log_if_fails` decorator
+
 ## [0.4.1] - 2024-2-1
 
 - Fix: Fix submodule usage detection when installed as an embedded dependency

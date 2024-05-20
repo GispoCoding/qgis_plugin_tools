@@ -13,12 +13,12 @@ class MessageBarLogger:
     Setup with a logger name that has a message bar set.
     """
 
-    def __init__(self, logger_name: str) -> None:
+    def __init__(self, logger_name: str, stack_level: int = 2) -> None:
         self._logger = logging.getLogger(logger_name)
         self._logger_kwargs: Dict[str, Any] = (
             {}
             if sys.version_info.major == 3 and sys.version_info.minor < 8
-            else {"stacklevel": 2}
+            else {"stacklevel": stack_level}
         )
 
     def info(
@@ -148,10 +148,16 @@ class MessageBarLogger:
         :param exc_info: Exception of handled exception for capturing traceback
         :param stack_info: Whether to include stack info
         """
-        self._logger.exception(
+        # for some reason using logger.exception will essentially have extra stack level
+        # even though its not visible on the printed stack (possibly due to exception
+        # being a simple helper which calls error internally). use plain error here to
+        # have same effective stacklevel on both actual log records. possibly related
+        # https://github.com/python/cpython/issues/89334 has been fixed in 3.11+
+        self._logger.error(
             str(message),
             extra=bar_msg(details, duration, success),
             stack_info=stack_info,
+            exc_info=True,
             **self._logger_kwargs,
         )
         if details != "":
